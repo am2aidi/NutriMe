@@ -15,7 +15,9 @@ export const Dashboard: React.FC = () => {
     resetRecovery, 
     showToast,
     user,
-    changeSubscriptionTier
+    changeSubscriptionTier,
+    healthStats,
+    syncHealthApp
   } = useApp();
 
   // Modals & Scanners state
@@ -201,7 +203,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
         
-        <div className="widgets-grid">
+        <div className="widgets-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
           <div className="card widget-card">
             <div className="widget-header">
               <span className="widget-title">Hydration Log</span>
@@ -231,6 +233,26 @@ export const Dashboard: React.FC = () => {
               onClick={() => showToast('Consistency metrics verified! Keep logging meals.', 'info')}
             >
               <i className="fas fa-info-circle"></i> Streak Details
+            </button>
+          </div>
+
+          <div className="card widget-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div className="widget-header">
+              <span className="widget-title">Health App Sync</span>
+              <div className="widget-icon icon-streak" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-info)' }}><i className="fas fa-heartpulse"></i></div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.2rem', margin: '0.5rem 0' }}>
+              <div>Steps: <strong style={{ color: 'white' }}>{healthStats.steps}</strong></div>
+              <div>Sleep: <strong style={{ color: 'white' }}>{healthStats.sleepHours} hrs</strong></div>
+              <div>Resting HR: <strong style={{ color: 'white' }}>{healthStats.restingHeartRate} bpm</strong></div>
+            </div>
+            <button 
+              type="button"
+              className="widget-action-btn" 
+              onClick={syncHealthApp}
+              style={{ color: 'var(--color-info)' }}
+            >
+              <i className="fas fa-arrows-spin"></i> Sync Fit ({healthStats.lastSynced})
             </button>
           </div>
         </div>
@@ -307,6 +329,35 @@ export const Dashboard: React.FC = () => {
               Allergy status: <strong style={{ color: 'var(--color-danger)' }}>Peanut-Free Excluded</strong>
             </span>
           </div>
+
+          {user.medicalConditions.length > 0 && (
+            <div style={{ 
+              marginBottom: '1.25rem', 
+              padding: '0.75rem 1rem', 
+              background: 'rgba(239, 68, 68, 0.08)', 
+              border: '1px solid rgba(239, 68, 68, 0.2)', 
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '0.82rem'
+            }}>
+              <span style={{ fontWeight: 800, color: 'var(--color-danger)', display: 'block', marginBottom: '0.25rem' }}>
+                <i className="fas fa-hand-holding-medical"></i> CLINICAL PROTOCOLS ACTIVE
+              </span>
+              <ul style={{ paddingLeft: '1.2rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.25rem', margin: 0 }}>
+                {user.medicalConditions.includes('diabetes') && (
+                  <li><strong>Diabetic Glycemic Protocol:</strong> Carbohydrates restricted to low-glycemic, slow-release fibers. Strictly exclude refined sugars, sweet juices, or heavy white Ugali.</li>
+                )}
+                {user.medicalConditions.includes('hypertension') && (
+                  <li><strong>Low-Sodium Guidelines:</strong> Limit processed condiments, stock powders, or added table salt to maintain blood pressure parameters.</li>
+                )}
+                {user.medicalConditions.includes('celiac') && (
+                  <li><strong>Gluten-Free Safety:</strong> Wheat, barley, rye ingredients banned. Rely on local potatoes, yams, or rice options.</li>
+                )}
+                {user.medicalConditions.includes('lactose') && (
+                  <li><strong>Lactose Exclusion:</strong> Avoid animal milk or dairy creamers. Substitute with coconut milk or water hydration.</li>
+                )}
+              </ul>
+            </div>
+          )}
 
           <div className="responsive-grid-split" style={{ gridTemplateColumns: '1.2fr 1.8fr' }}>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--surface-border)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>

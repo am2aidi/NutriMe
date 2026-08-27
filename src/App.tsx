@@ -5,7 +5,7 @@ import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { MealPlanner } from './components/MealPlanner';
 import { Restaurants } from './components/Restaurants';
-import { StravaTracker } from './components/StravaTracker';
+import { ActiveTracker } from './components/ActiveTracker';
 import { GymHub } from './components/GymHub';
 import { AiChatbot } from './components/AiChatbot';
 import { Analytics } from './components/Analytics';
@@ -49,8 +49,8 @@ const AppContent: React.FC = () => {
         return <MealPlanner />;
       case 'orders':
         return <Restaurants />;
-      case 'strava':
-        return <StravaTracker />;
+      case 'activeTracker':
+        return <ActiveTracker />;
       case 'gym':
         return <GymHub />;
       case 'chat':

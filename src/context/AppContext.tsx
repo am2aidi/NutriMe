@@ -10,7 +10,7 @@ import type {
   RecoveryState,
   AuthState,
   ChatMessage,
-  StravaActivity,
+  ActiveWorkout,
   Medal,
   HealthStats
 } from '../types';
@@ -93,7 +93,7 @@ const INITIAL_RESTAURANTS: Restaurant[] = [
 ];
 
 // Preloaded mock cycling/running routes in Kigali
-const INITIAL_ACTIVITIES: StravaActivity[] = [
+const INITIAL_ACTIVITIES: ActiveWorkout[] = [
   {
     id: 'act_1',
     type: 'ride',
@@ -173,10 +173,10 @@ interface AppContextType {
   clearChat: () => void;
   isAiGenerating: boolean;
 
-  // Strava activities & medals
-  activities: StravaActivity[];
+  // Branded Workout activities & medals
+  activities: ActiveWorkout[];
   medals: Medal[];
-  addStravaActivity: (type: 'run' | 'ride', name: string, distanceKm: number, durationMins: number, path: [number, number][]) => void;
+  addWorkoutActivity: (type: 'run' | 'ride', name: string, distanceKm: number, durationMins: number, path: [number, number][]) => void;
 
   // Health app sync
   healthStats: HealthStats;
@@ -221,8 +221,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
 
-  // Strava activities & medals state
-  const [activities, setActivities] = useState<StravaActivity[]>(INITIAL_ACTIVITIES);
+  // Activities & medals state
+  const [activities, setActivities] = useState<ActiveWorkout[]>(INITIAL_ACTIVITIES);
   const [medals, setMedals] = useState<Medal[]>(INITIAL_MEDALS);
   const [burnedCalories, setBurnedCalories] = useState(746); 
 
@@ -257,7 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     region: 'rwanda',
     city: 'Kigali',
     allergies: [],
-    medicalConditions: [], // diabetes, hypertension, celiac, lactose
+    medicalConditions: [], 
     mealSchedule: {
       breakfast: '08:00',
       lunch: '13:00',
@@ -442,8 +442,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast("Synced with Google Fit / Health App!", "info");
   };
 
-  // Strava activities & Medals
-  const addStravaActivity = (
+  // Workout activity & medals checks
+  const addWorkoutActivity = (
     type: 'run' | 'ride', 
     name: string, 
     distanceKm: number, 
@@ -451,7 +451,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     path: [number, number][]
   ) => {
     const burn = Math.round(distanceKm * (type === 'run' ? 60 : 35));
-    const newAct: StravaActivity = {
+    const newAct: ActiveWorkout = {
       id: 'act_' + Date.now(),
       type,
       name,
@@ -473,18 +473,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return nextBurn;
     });
 
-    // Check achievement medals thresholds
+    // Check achievements
     setMedals(prevMedals => 
       prevMedals.map(medal => {
         if (!medal.unlocked && medal.category === type && distanceKm >= medal.threshold) {
-          showToast(`🏆 Medal Unlocked: ${medal.title}!`, 'success');
+          showToast(`🏆 Milestone Achieved: ${medal.title}!`, 'success');
           return { ...medal, unlocked: true };
         }
         return medal;
       })
     );
 
-    showToast(`Strava synced: ${name} (+${burn} kcal burned)`, 'info');
+    showToast(`Activity recorded: ${name} (+${burn} kcal burned)`, 'info');
   };
 
   const changeSubscriptionTier = (tier: 'free' | 'premium' | 'ultimate') => {
@@ -537,10 +537,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const totalKcal = kcal + activeBurned;
 
-    // Adjust macro ratios if diabetes is active (low carb, higher protein/fat)
     let pRatio = 0.20, cRatio = 0.50, fRatio = 0.30;
     if (customUser.medicalConditions.includes('diabetes')) {
-      // Low Glycemic, diabetic protocol
       pRatio = 0.35; fRatio = 0.35; cRatio = 0.30;
     } else if (customUser.goal === 'loss') {
       pRatio = 0.30; fRatio = 0.25; cRatio = 0.45;
@@ -555,7 +553,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setTargets({ calories: totalKcal, protein: p, carbs: c, fat: f, water: w, burnedCalories: activeBurned });
     
-    // Distribute among schedule
     const ratios: Record<string, number> = {
       breakfast: 0.25,
       lunch: 0.35,
@@ -571,13 +568,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const ratio = ratios[m.id] || 0;
         const slotCal = Math.round(totalKcal * ratio);
         
-        // Exclude sweet/sugary foods or high glycemic meals if Diabetic
         let candidates = currentFoods.filter(food => 
           food.category === m.type && food.region === customUser.region
         );
         
         if (customUser.medicalConditions.includes('diabetes')) {
-          candidates = candidates.filter(f => f.carbs < 40); // safety restriction
+          candidates = candidates.filter(f => f.carbs < 40);
         }
         
         if (candidates.length > 0) {
@@ -860,7 +856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         city: 'Kigali',
         dietPreference: 'anything',
         allergies: [],
-        medicalConditions: ['diabetes'], // diabetic preset!
+        medicalConditions: ['diabetes'],
         mealSchedule: user.mealSchedule,
         subscriptionTier: 'free' as const,
         onboarded: false
@@ -930,7 +926,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       activities,
       medals,
-      addStravaActivity,
+      addWorkoutActivity,
 
       healthStats,
       syncHealthApp,

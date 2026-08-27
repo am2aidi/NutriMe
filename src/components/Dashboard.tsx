@@ -157,7 +157,7 @@ export const Dashboard: React.FC = () => {
               <span className="calories-label">of <span id="dash_kcal_target">{targets.calories}</span> kcal</span>
               {targets.burnedCalories > 0 && (
                 <span style={{ fontSize: '0.68rem', color: 'var(--color-primary)', fontWeight: 600, marginTop: '0.2rem' }}>
-                  +{targets.burnedCalories} kcal from Strava
+                  +{targets.burnedCalories} kcal active burn
                 </span>
               )}
             </div>
@@ -493,7 +493,7 @@ export const Dashboard: React.FC = () => {
             <div className="modal-header" style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase' }}>Upgrade Plan</span>
               <h3 style={{ fontFamily: 'var(--font-heading)', color: 'white', marginTop: '0.25rem' }}>Ecosystem Subscriptions</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Unlock personalized meal matching, Strava overlays, and live Gemini AI channels.</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Unlock personalized meal matching, active tracking overlays, and live Gemini AI channels.</p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -566,7 +566,7 @@ export const Dashboard: React.FC = () => {
                   <h4 style={{ fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     Ultimate Ecosystem <i className="fas fa-bolt" style={{ color: 'var(--color-secondary)', fontSize: '0.85rem' }}></i>
                   </h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Strava trackings, live Gemini AI bot console, & restaurant menus integration.</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Ecosystem activity trackings, live Gemini AI bot console, & restaurant menus integration.</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--color-secondary)' }}>5,000 RWF</span>

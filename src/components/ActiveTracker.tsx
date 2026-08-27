@@ -7,8 +7,8 @@ declare global {
   }
 }
 
-export const StravaTracker: React.FC = () => {
-  const { activities, addStravaActivity, medals } = useApp();
+export const ActiveTracker: React.FC = () => {
+  const { activities, addWorkoutActivity, medals } = useApp();
   const [activityType, setActivityType] = useState<'run' | 'ride'>('run');
   const [distance, setDistance] = useState('5.0');
   const [duration, setDuration] = useState('30');
@@ -40,12 +40,10 @@ export const StravaTracker: React.FC = () => {
   useEffect(() => {
     if (!window.L || !mapContainerRef.current) return;
 
-    // Destroy existing instance if active
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove();
     }
 
-    // Set map center at Kigali Heights
     const map = window.L.map(mapContainerRef.current, {
       center: [-1.9442, 30.0898],
       zoom: 14,
@@ -54,12 +52,10 @@ export const StravaTracker: React.FC = () => {
 
     mapInstanceRef.current = map;
 
-    // Load OpenStreetMap tiles
     window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Initial polyline draw
     const activeCoords = activityType === 'run' ? KIGALI_ROUTES.run : KIGALI_ROUTES.ride;
     const polyline = window.L.polyline(activeCoords, {
       color: activityType === 'run' ? '#10b981' : '#8b5cf6',
@@ -69,7 +65,6 @@ export const StravaTracker: React.FC = () => {
 
     polylineRef.current = polyline;
 
-    // Set markers at start and end
     window.L.marker(activeCoords[0], {
       icon: window.L.divIcon({
         className: 'custom-map-pin start',
@@ -77,7 +72,6 @@ export const StravaTracker: React.FC = () => {
       })
     }).addTo(map);
 
-    // Fit bounds
     map.fitBounds(polyline.getBounds());
 
   }, [activityType]);
@@ -93,14 +87,13 @@ export const StravaTracker: React.FC = () => {
     }
 
     const routeName = activityType === 'run' 
-      ? `Kimihurura Valley ${distVal}km Run`
-      : `Kigali Heights ${distVal}km Biking Route`;
+      ? `Kimihurura Valley ${distVal}km Running Session`
+      : `Kigali Heights ${distVal}km Cycling Route`;
 
     const chosenPath = activityType === 'run' ? KIGALI_ROUTES.run : KIGALI_ROUTES.ride;
 
-    addStravaActivity(activityType, routeName, distVal, durVal, chosenPath);
+    addWorkoutActivity(activityType, routeName, distVal, durVal, chosenPath);
     
-    // Animate map panning and success indicators
     if (mapInstanceRef.current) {
       mapInstanceRef.current.panTo([-1.9442, 30.0898]);
     }
@@ -110,8 +103,8 @@ export const StravaTracker: React.FC = () => {
     <section id="stravaView" className="view-section">
       <div className="content-header">
         <div className="header-title-container">
-          <h1>Ecosystem Activity Tracker</h1>
-          <p>Draw bike and running routes around Kigali. Sync active TDEE calorie burns to your daily targets (Strava Integration).</p>
+          <h1>GPS Activity Tracker</h1>
+          <p>Draw bike and running routes around Kigali. Sync active TDEE calorie burns to your daily targets using local browser GPS simulation.</p>
         </div>
       </div>
 
@@ -121,7 +114,6 @@ export const StravaTracker: React.FC = () => {
         <div className="card" style={{ padding: 0, position: 'relative', height: '450px', overflow: 'hidden' }}>
           <div ref={mapContainerRef} style={{ width: '100%', height: '100%', background: '#111827' }}></div>
           
-          {/* Map Overlay stats */}
           <div style={{
             position: 'absolute',
             bottom: '15px',
@@ -184,7 +176,7 @@ export const StravaTracker: React.FC = () => {
                       value="ride" 
                       checked={activityType === 'ride'}
                       onChange={() => setActivityType('ride')}
-                    /> <i className="fas fa-motorcycle" style={{ color: 'var(--color-secondary)' }}></i> Cycling
+                    /> <i className="fas fa-bicycle" style={{ color: 'var(--color-secondary)' }}></i> Cycling
                   </label>
                 </div>
               </div>
@@ -214,7 +206,7 @@ export const StravaTracker: React.FC = () => {
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
-                Sync Strava Metrics <i className="fas fa-arrows-spin"></i>
+                Sync Active metrics <i className="fas fa-arrows-spin"></i>
               </button>
             </form>
           </div>
@@ -234,7 +226,7 @@ export const StravaTracker: React.FC = () => {
       {/* Medals Trophy Showcase */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <i className="fas fa-trophy" style={{ color: 'var(--color-accent)' }}></i> Strava Achievements & Medals
+          <i className="fas fa-trophy" style={{ color: 'var(--color-accent)' }}></i> Ecosystem Achievements & Medals
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginTop: '1.25rem' }}>
           {medals.map(m => {
@@ -336,4 +328,4 @@ export const StravaTracker: React.FC = () => {
     </section>
   );
 };
-export default StravaTracker;
+export default ActiveTracker;

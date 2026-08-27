@@ -36,7 +36,7 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-export interface StravaActivity {
+export interface ActiveWorkout {
   id: string;
   type: 'run' | 'ride'; // run (foot), ride (bicycle)
   name: string;
@@ -70,7 +70,7 @@ export interface DailyTargets {
   carbs: number;
   fat: number;
   water: number;
-  burnedCalories: number; // dynamically added from Strava running/biking
+  burnedCalories: number; // dynamically added from active running/biking
 }
 
 export interface IntakeLog {

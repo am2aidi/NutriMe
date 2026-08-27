@@ -22,7 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen })
     { id: 'home', label: 'Dashboard', icon: 'fa-chart-pie' },
     { id: 'plan', label: 'Meal Plan', icon: 'fa-calendar-alt' },
     { id: 'orders', label: 'Restaurant Meals', icon: 'fa-shopping-bag' },
-    { id: 'strava', label: 'Strava Tracker', icon: 'fa-bicycle' },
+    { id: 'activeTracker', label: 'Active Tracker', icon: 'fa-bicycle' },
     { id: 'gym', label: 'Gym Hub', icon: 'fa-dumbbell' },
     { id: 'chat', label: 'AI Chatbot', icon: 'fa-robot' },
     { id: 'progress', label: 'Goal Analytics', icon: 'fa-chart-line' },

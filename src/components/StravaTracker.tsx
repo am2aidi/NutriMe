@@ -8,7 +8,7 @@ declare global {
 }
 
 export const StravaTracker: React.FC = () => {
-  const { activities, addStravaActivity } = useApp();
+  const { activities, addStravaActivity, medals } = useApp();
   const [activityType, setActivityType] = useState<'run' | 'ride'>('run');
   const [distance, setDistance] = useState('5.0');
   const [duration, setDuration] = useState('30');
@@ -231,45 +231,107 @@ export const StravaTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent Activities Log */}
-      <div className="card">
-        <h3 className="card-title">Recent Synced Workouts</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-          {activities.map(act => (
-            <div key={act.id} className="substitute-item-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '50%',
-                  background: act.type === 'run' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.12)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.1rem',
-                  color: act.type === 'run' ? 'var(--color-primary)' : 'var(--color-secondary)'
-                }}>
-                  <i className={`fas ${act.type === 'run' ? 'fa-person-running' : 'fa-bicycle'}`}></i>
+      {/* Medals Trophy Showcase */}
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <i className="fas fa-trophy" style={{ color: 'var(--color-accent)' }}></i> Strava Achievements & Medals
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem', marginTop: '1.25rem' }}>
+          {medals.map(m => {
+            const medalColor = m.type === 'gold' ? '#fbbf24' : m.type === 'silver' ? '#cbd5e1' : '#b45309';
+            return (
+              <div 
+                key={m.id}
+                style={{
+                  background: m.unlocked ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.005)',
+                  border: `1px solid ${m.unlocked ? 'var(--surface-border)' : 'rgba(255,255,255,0.02)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1.25rem 1rem',
+                  textAlign: 'center',
+                  opacity: m.unlocked ? 1 : 0.35,
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <div style={{ fontSize: '2.2rem', color: medalColor, marginBottom: '0.5rem' }}>
+                  <i className="fas fa-medal"></i>
                 </div>
-                <div>
-                  <h5 style={{ fontWeight: 700 }}>{act.name}</h5>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {act.distanceKm} km | {act.durationMins} mins | {act.date}
-                  </p>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
+                <h5 style={{ fontWeight: 700, color: m.unlocked ? 'white' : 'var(--text-muted)', fontSize: '0.9rem' }}>{m.title}</h5>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', minHeight: '32px' }}>{m.description}</p>
                 <span style={{ 
-                  fontWeight: 700, 
-                  color: act.type === 'run' ? 'var(--color-primary)' : 'var(--color-secondary)' 
+                  fontSize: '0.65rem', 
+                  fontWeight: 800, 
+                  color: m.unlocked ? 'var(--color-primary)' : 'var(--text-muted)',
+                  display: 'inline-block',
+                  marginTop: '0.75rem',
+                  padding: '0.15rem 0.5rem',
+                  background: m.unlocked ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.02)',
+                  borderRadius: 'var(--radius-sm)'
                 }}>
-                  +{act.caloriesBurned} kcal
+                  {m.unlocked ? 'UNLOCKED' : 'LOCKED'}
                 </span>
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Calorie Allowance Adjusted</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+      </div>
+
+      {/* Grouped Activities Log */}
+      <div className="responsive-grid-split">
+        
+        {/* Foot Runs list */}
+        <div className="card">
+          <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
+            <i className="fas fa-person-running" style={{ color: 'var(--color-primary)' }}></i> Running Logs (Foot)
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
+            {activities.filter(a => a.type === 'run').length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center', padding: '1rem' }}>No runs logged yet.</p>
+            ) : (
+              activities.filter(a => a.type === 'run').map(act => (
+                <div key={act.id} className="substitute-item-card" style={{ padding: '0.85rem' }}>
+                  <div>
+                    <h5 style={{ fontWeight: 700, fontSize: '0.9rem' }}>{act.name}</h5>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                      {act.distanceKm} km | {act.durationMins} mins | {act.date}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontWeight: 800, color: 'var(--color-primary)', fontSize: '0.95rem' }}>+{act.caloriesBurned} kcal</span>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Burn Synced</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Bicycle Rides list */}
+        <div className="card">
+          <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
+            <i className="fas fa-bicycle" style={{ color: 'var(--color-secondary)' }}></i> Cycling Logs (Bicycle)
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
+            {activities.filter(a => a.type === 'ride').length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center', padding: '1rem' }}>No rides logged yet.</p>
+            ) : (
+              activities.filter(a => a.type === 'ride').map(act => (
+                <div key={act.id} className="substitute-item-card" style={{ padding: '0.85rem' }}>
+                  <div>
+                    <h5 style={{ fontWeight: 700, fontSize: '0.9rem' }}>{act.name}</h5>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                      {act.distanceKm} km | {act.durationMins} mins | {act.date}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontWeight: 800, color: 'var(--color-secondary)', fontSize: '0.95rem' }}>+{act.caloriesBurned} kcal</span>
+                    <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Burn Synced</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
       </div>
     </section>
   );

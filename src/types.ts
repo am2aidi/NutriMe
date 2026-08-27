@@ -18,8 +18,32 @@ export interface UserProfile {
     snack: string;
     beverage: string;
   };
-  hasSubscription: boolean;
+  subscriptionTier: 'free' | 'premium' | 'ultimate'; // free, 2000 RWF (premium), 5000 RWF (ultimate)
   onboarded: boolean;
+}
+
+export interface AuthState {
+  isLoggedIn: boolean;
+  email: string | null;
+  name: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp: string;
+}
+
+export interface StravaActivity {
+  id: string;
+  type: 'run' | 'ride';
+  name: string;
+  distanceKm: number;
+  durationMins: number;
+  caloriesBurned: number;
+  date: string;
+  path: [number, number][]; // coordinates for Leaflet lines
 }
 
 export interface DailyTargets {
@@ -28,6 +52,7 @@ export interface DailyTargets {
   carbs: number;
   fat: number;
   water: number;
+  burnedCalories: number; // dynamically added from Strava running/biking
 }
 
 export interface IntakeLog {

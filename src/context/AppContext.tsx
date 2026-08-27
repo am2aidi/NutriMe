@@ -7,7 +7,10 @@ import type {
   Restaurant, 
   OrderItem, 
   MealItem, 
-  RecoveryState 
+  RecoveryState,
+  AuthState,
+  ChatMessage,
+  StravaActivity
 } from '../types';
 
 // ==========================================
@@ -17,7 +20,7 @@ const INITIAL_FOOD_DATABASE: FoodItem[] = [
   // --- Rwandan Local Foods ---
   { id: 'rw_isombe', name: 'Isombe (Cassava Leaves Stew)', category: 'lunch', region: 'rwanda', calories: 150, protein: 6, carbs: 12, fat: 9, serving: '150g', desc: 'Cassava leaves pounded and simmered with onions, eggplant, and peanut paste.' },
   { id: 'rw_ugali', name: 'Ugali (Maize Flour Paste)', category: 'lunch', region: 'rwanda', calories: 220, protein: 4, carbs: 48, fat: 1, serving: '150g', desc: 'Starchy staple cooked by mixing maize flour with boiling water.' },
-  { id: 'rw_matooke', name: 'Steamed Matooke (Green Bananas)', category: 'dinner', region: 'rwanda', calories: 180, protein: 2, carbs: 42, fat: 0.5, serving: '200g', desc: 'Steamed and lightly mashed green plantains.' },
+  { id: 'rw_matooke', name: 'Steamed Matooke (Green Bananas)', category: 'dinner', region: 'rwanda', calories: 180, protein: 2, carbs: 42, fat: 0.5, serving: '200g', desc: 'Steamed and mashed green plantains.' },
   { id: 'rw_brochettes_goat', name: 'Goat Brochette (Skewer)', category: 'dinner', region: 'rwanda', calories: 250, protein: 24, carbs: 1, fat: 16, serving: '1 skewer (120g)', desc: 'Tender chunks of grilled goat meat spiced with local piri-piri.' },
   { id: 'rw_brochettes_beef', name: 'Beef Brochette (Skewer)', category: 'dinner', region: 'rwanda', calories: 230, protein: 26, carbs: 1, fat: 13, serving: '1 skewer (120g)', desc: 'Local charcoal-grilled spiced beef skewer.' },
   { id: 'rw_tilapia', name: 'Grilled Tilapia Fish', category: 'dinner', region: 'rwanda', calories: 210, protein: 26, carbs: 0, fat: 11, serving: '150g fillet', desc: 'Whole or filleted tilapia seasoned with garlic and local herbs, grilled over open flames.' },
@@ -87,6 +90,42 @@ const INITIAL_RESTAURANTS: Restaurant[] = [
   }
 ];
 
+// Preloaded mock cycling/running routes in Kigali
+const INITIAL_ACTIVITIES: StravaActivity[] = [
+  {
+    id: 'act_1',
+    type: 'ride',
+    name: 'Kigali Heights Evening Ride',
+    distanceKm: 12.4,
+    durationMins: 35,
+    caloriesBurned: 434,
+    date: '2026-08-26',
+    path: [
+      [-1.9442, 30.0898], // Kigali Heights
+      [-1.9485, 30.0924], // Kimihurura roundabout
+      [-1.9515, 30.0880], // Cadran
+      [-1.9472, 30.0832], // Rugando
+      [-1.9442, 30.0898]  // Kigali Heights Loop
+    ]
+  },
+  {
+    id: 'act_2',
+    type: 'run',
+    name: 'Kimihurura Valley Jog',
+    distanceKm: 5.2,
+    durationMins: 28,
+    caloriesBurned: 312,
+    date: '2026-08-25',
+    path: [
+      [-1.9485, 30.0924], // Kimihurura
+      [-1.9540, 30.0950], // toward Papyrus
+      [-1.9580, 30.0890], // valley road
+      [-1.9510, 30.0840], // Rugando hill
+      [-1.9485, 30.0924]  // return
+    ]
+  }
+];
+
 // ==========================================
 // 2. CONTEXT DECLARATIONS & INTERFACES
 // ==========================================
@@ -109,6 +148,27 @@ interface AppContextType {
   restaurants: Restaurant[];
   toasts: ToastMsg[];
   
+  // Auth states & actions
+  auth: AuthState;
+  login: (email: string, name: string) => void;
+  signup: (email: string, name: string) => void;
+  logout: () => void;
+  
+  // AI Chatbot
+  geminiApiKey: string;
+  saveGeminiApiKey: (key: string) => void;
+  chatMessages: ChatMessage[];
+  sendChatMessage: (text: string) => Promise<void>;
+  clearChat: () => void;
+  isAiGenerating: boolean;
+
+  // Strava activities
+  activities: StravaActivity[];
+  addStravaActivity: (type: 'run' | 'ride', name: string, distanceKm: number, durationMins: number, path: [number, number][]) => void;
+
+  // Subscriptions & scanner
+  changeSubscriptionTier: (tier: 'free' | 'premium' | 'ultimate') => void;
+  
   updateUserProfile: (updates: Partial<UserProfile>) => void;
   logMealState: (mealId: string, status: MealItem['status']) => void;
   substituteMeal: (mealId: string, foodId: string) => void;
@@ -126,12 +186,35 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State variables
+  // Navigation & Toast alerts
   const [activeTab, setActiveTab] = useState<string>('setup');
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
+
+  // Authentication State
+  const [auth, setAuth] = useState<AuthState>({
+    isLoggedIn: false,
+    email: null,
+    name: null
+  });
+
+  // Gemini API Key (loaded from localStorage if exists)
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem('nutrime_gemini_key') || '';
+  });
+
+  // AI Chatbot state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
+  // Strava activity log state
+  const [activities, setActivities] = useState<StravaActivity[]>(INITIAL_ACTIVITIES);
+  const [burnedCalories, setBurnedCalories] = useState(746); // Init preloaded workouts calorie burn sum
+
+  // Databases
   const [foodDatabase, setFoodDatabase] = useState<FoodItem[]>(INITIAL_FOOD_DATABASE);
   const [restaurants] = useState<Restaurant[]>(INITIAL_RESTAURANTS);
   const [orders, setOrders] = useState<OrderItem[]>([]);
+  
   const [recovery, setRecovery] = useState<RecoveryState>({
     active: false,
     message: '',
@@ -157,7 +240,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       snack: '16:00',
       beverage: '11:00'
     },
-    hasSubscription: false,
+    subscriptionTier: 'free',
     onboarded: false
   });
 
@@ -166,7 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     protein: 120,
     carbs: 220,
     fat: 65,
-    water: 2500
+    water: 2500,
+    burnedCalories: 746
   });
 
   const [intake, setIntake] = useState<IntakeLog>({
@@ -178,7 +262,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     streak: 5
   });
 
-  // Schedule template
+  // Daily food timeline
   const [meals, setMeals] = useState<MealItem[]>([
     { id: 'breakfast', name: 'Breakfast', time: '08:00', type: 'breakfast', status: 'pending', food: {} as FoodItem },
     { id: 'beverage_mid', name: 'Mid-Morning Hydration', time: '11:00', type: 'beverage', status: 'pending', food: {} as FoodItem },
@@ -187,15 +271,184 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { id: 'dinner', name: 'Dinner', time: '19:30', type: 'dinner', status: 'pending', food: {} as FoodItem }
   ]);
 
-  // Toast notifications helpers
+  // Auth Operations
+  const login = (email: string, name: string) => {
+    setAuth({ isLoggedIn: true, email, name });
+    showToast(`Welcome back, ${name || 'User'}!`);
+  };
+
+  const signup = (email: string, name: string) => {
+    setAuth({ isLoggedIn: true, email, name });
+    showToast(`Account created successfully! Welcome, ${name}!`);
+  };
+
+  const logout = () => {
+    setAuth({ isLoggedIn: false, email: null, name: null });
+    setUser(prev => ({ ...prev, onboarded: false }));
+    setActiveTab('setup');
+    showToast("Logged out successfully.", "info");
+  };
+
+  // Gemini API Key Saver
+  const saveGeminiApiKey = (key: string) => {
+    setGeminiApiKey(key);
+    localStorage.setItem('nutrime_gemini_key', key);
+    showToast("Gemini API key saved! Chatbot now running live AI.", "info");
+  };
+
+  // Chatbot send action (live fetch to gemini API endpoint)
+  const sendChatMessage = async (text: string) => {
+    if (!text.trim()) return;
+
+    const userMsg: ChatMessage = {
+      id: 'chat_' + Date.now() + '_u',
+      sender: 'user',
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setChatMessages(prev => [...prev, userMsg]);
+    setIsAiGenerating(true);
+
+    const promptContext = `
+      You are the NutriMe AI Personal Assistant. The user's goal is: ${user.goal === 'loss' ? 'weight loss' : user.goal === 'gain' ? 'muscle gain' : 'maintenance'}.
+      Their body metrics are: weight ${user.weight}kg, height ${user.height}cm, age ${user.age} years.
+      They live in region: ${user.region} (City: ${user.city}).
+      Their daily nutritional targets are: ${targets.calories} kcal, ${targets.protein}g protein, ${targets.carbs}g carbs, ${targets.fat}g fat.
+      Today they have consumed: ${intake.calories} kcal, and burned ${burnedCalories} kcal through active workouts.
+      Keep answers concise, direct, supportive, and focus on healthy local foods (e.g. Rwandan staples like Isombe, Matooke, Brochettes, Ugali if region is Rwanda, or global healthy foods otherwise). Avoid complex jargon.
+    `;
+
+    try {
+      if (geminiApiKey) {
+        // Direct call to Gemini 1.5 Flash endpoint
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: `${promptContext}\nUser question: ${text}` }
+                  ]
+                }
+              ]
+            })
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('API request failed');
+        }
+
+        const data = await response.json();
+        const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I was unable to formulate a reply.";
+        
+        const aiMsg: ChatMessage = {
+          id: 'chat_' + Date.now() + '_a',
+          sender: 'ai',
+          text: rawReply.replace(/\*\*/g, '').trim(), // strip markdown bolding for clean look
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setChatMessages(prev => [...prev, aiMsg]);
+      } else {
+        // Mock fallback simulation
+        setTimeout(() => {
+          let reply = "Hello! To enable real AI responses, please enter your Gemini API Key in the settings at the top of the chat panel. Let me know if you need help generating one.";
+          
+          const textLower = text.toLowerCase();
+          if (textLower.includes('eat') || textLower.includes('food') || textLower.includes('snack')) {
+            reply = user.region === 'rwanda' 
+              ? "For a quick snack in Kigali, I recommend a half portion of local Avocado with salt (approx 160 kcal, rich in healthy fats) or Umusururu porridge if you want a warm breakfast option."
+              : "For a quick snack, I suggest 30g of raw Almonds (160 kcal) or a plain Greek yogurt cup (130 kcal, 15g protein) to help hit your target.";
+          } else if (textLower.includes('calorie') || textLower.includes('macro')) {
+            reply = `Your calculated target calorie allowance for today is ${targets.calories} kcal (including ${burnedCalories} kcal extra burned from bike/runs). You have consumed ${intake.calories} kcal so far.`;
+          }
+
+          const aiMsg: ChatMessage = {
+            id: 'chat_' + Date.now() + '_a',
+            sender: 'ai',
+            text: reply,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          setChatMessages(prev => [...prev, aiMsg]);
+        }, 1500);
+      }
+    } catch (err) {
+      console.error(err);
+      const aiMsg: ChatMessage = {
+        id: 'chat_' + Date.now() + '_err',
+        sender: 'ai',
+        text: "Error connecting to Gemini API. Please check your network connection and ensure your API key is correct.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setChatMessages(prev => [...prev, aiMsg]);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
+
+  const clearChat = () => {
+    setChatMessages([
+      {
+        id: 'chat_welcome',
+        sender: 'ai',
+        text: `Hi ${auth.name || 'there'}! I am your NutriMe AI Assistant. Ask me anything about local foods, macro targets, or recipe advice!`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  };
+
+  // Strava activities
+  const addStravaActivity = (
+    type: 'run' | 'ride', 
+    name: string, 
+    distanceKm: number, 
+    durationMins: number,
+    path: [number, number][]
+  ) => {
+    // Run: 60 kcal per km. Ride: 35 kcal per km.
+    const burn = Math.round(distanceKm * (type === 'run' ? 60 : 35));
+    const newAct: StravaActivity = {
+      id: 'act_' + Date.now(),
+      type,
+      name,
+      distanceKm,
+      durationMins,
+      caloriesBurned: burn,
+      date: new Date().toISOString().split('T')[0],
+      path
+    };
+
+    setActivities(prev => [newAct, ...prev]);
+    setBurnedCalories(prev => {
+      const nextBurn = prev + burn;
+      // Adjust targets
+      setTargets(t => ({
+        ...t,
+        calories: t.calories + burn,
+        burnedCalories: nextBurn
+      }));
+      return nextBurn;
+    });
+
+    showToast(`Strava synced: ${name} (+${burn} kcal burned)`, 'info');
+  };
+
+  const changeSubscriptionTier = (tier: 'free' | 'premium' | 'ultimate') => {
+    setUser(prev => ({ ...prev, subscriptionTier: tier }));
+    showToast(`Subscription changed to ${tier === 'free' ? 'Free' : tier === 'premium' ? 'Premium (2000 RWF)' : 'Ultimate (5000 RWF)'}!`);
+  };
+
+  // Toast dispatch
   const showToast = (message: string, type: ToastMsg['type'] = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts(prev => [...prev, { id, message, type }]);
-    
-    // Auto-fadeout
-    setTimeout(() => {
-      removeToast(id);
-    }, 4000);
+    setTimeout(() => removeToast(id), 4000);
   };
 
   const removeToast = (id: string) => {
@@ -207,7 +460,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let bmr = 10 * w + 6.25 * h - 5 * a;
     if (g === 'male') return Math.round(bmr + 5);
     if (g === 'female') return Math.round(bmr - 161);
-    return Math.round(bmr - 78); // Average gender neutral
+    return Math.round(bmr - 78);
   };
 
   const calculateTDEE = (bmr: number, activity: string) => {
@@ -222,17 +475,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Recalculates Target Macros & updates Meal Generation Planner
-  const recalculateMacrosAndPlans = (customUser = user, currentFoods = foodDatabase) => {
+  const recalculateMacrosAndPlans = (customUser = user, currentFoods = foodDatabase, activeBurned = burnedCalories) => {
     const bmr = calculateBMR(customUser.weight, customUser.height, customUser.age, customUser.gender);
     const tdee = calculateTDEE(bmr, customUser.activity);
     
     let kcal = tdee;
     if (customUser.goal === 'loss') {
-      kcal = Math.max(tdee - 500, 1200); // 1200 kcal floor safety
+      kcal = Math.max(tdee - 500, 1200); 
     } else if (customUser.goal === 'gain') {
       kcal = tdee + 400;
     }
     kcal = Math.round(kcal);
+
+    // Apply active calorie adjustment from workouts
+    const totalKcal = kcal + activeBurned;
 
     let pRatio = 0.20, cRatio = 0.50, fRatio = 0.30;
     if (customUser.goal === 'loss') {
@@ -241,15 +497,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pRatio = 0.25; fRatio = 0.25; cRatio = 0.50;
     }
 
-    const p = Math.round((kcal * pRatio) / 4);
-    const c = Math.round((kcal * cRatio) / 4);
-    const f = Math.round((kcal * fRatio) / 9);
-    const w = Math.round(customUser.weight * 35); // 35ml per kg bodyweight
+    const p = Math.round((totalKcal * pRatio) / 4);
+    const c = Math.round((totalKcal * cRatio) / 4);
+    const f = Math.round((totalKcal * fRatio) / 9);
+    const w = Math.round(customUser.weight * 35); 
 
-    const nextTargets = { calories: kcal, protein: p, carbs: c, fat: f, water: w };
-    setTargets(nextTargets);
+    setTargets({ calories: totalKcal, protein: p, carbs: c, fat: f, water: w, burnedCalories: activeBurned });
     
-    // Distribute among food schedule
+    // Distribute among schedule
     const ratios: Record<string, number> = {
       breakfast: 0.25,
       lunch: 0.35,
@@ -260,18 +515,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setMeals(prevMeals => 
       prevMeals.map(m => {
-        // If the meal is already eaten/skipped, don't re-plan it!
         if (m.status === 'eaten' || m.status === 'skipped') return m;
         
         const ratio = ratios[m.id] || 0;
-        const slotCal = Math.round(kcal * ratio);
+        const slotCal = Math.round(totalKcal * ratio);
         
         const candidates = currentFoods.filter(food => 
           food.category === m.type && food.region === customUser.region
         );
         
         if (candidates.length > 0) {
-          // Sort candidates by closeness to calorie targets
           let bestFood = candidates[0];
           let smallestDiff = Infinity;
           
@@ -302,7 +555,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           };
         } else {
-          // Fallback to global
           const fallbacks = currentFoods.filter(food => food.category === m.type);
           const fallbackFood = fallbacks[0] || { name: 'Health Shake', calories: slotCal, protein: Math.round(p * ratio), carbs: Math.round(c * ratio), fat: Math.round(f * ratio), serving: '1 scoop', desc: 'Balanced nutrition formulation.' };
           return {
@@ -328,7 +580,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       const oldMeal = nextMeals[targetIndex];
       
-      // If it was already logged as eaten, deduct nutrients
       if (oldMeal.status === 'eaten') {
         setIntake(prev => ({
           ...prev,
@@ -352,8 +603,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         showToast(`Logged: ${updatedMeal.food.name} (${updatedMeal.food.calories} kcal)`);
       } else if (status === 'skipped') {
-        // Redirection system active!
-        // Find next remaining pending meals
         const nextPending = nextMeals.slice(targetIndex + 1).filter(m => m.status === 'pending');
         setRecovery({
           active: true,
@@ -389,9 +638,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           showToast("Adaptive Plan Recalculated!", "warning");
         }
       } else if (status === 'pending' && recovery.skippedMealId === mealId) {
-        // Reset recovery if reverted
         setRecovery({ active: false, skippedMealId: null, adjustmentMade: false, message: '' });
-        // Trigger macro plans re-distribution to purge changes
         setTimeout(() => recalculateMacrosAndPlans(), 50);
       }
 
@@ -457,7 +704,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders(prev => [newOrder, ...prev]);
     showToast("Order placed successfully!", "info");
 
-    // Automatically replace meal slot in dashboard log
     if (mealIdToReplace) {
       setMeals(prevMeals => 
         prevMeals.map(m => {
@@ -465,7 +711,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           
           return {
             ...m,
-            status: 'eaten', // Auto logs eaten
+            status: 'eaten', 
             food: {
               id: 'rest_item_' + item.id,
               name: `[Restaurant] ${item.name}`,
@@ -490,7 +736,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // Run live simulation tracker updates
     let steps: OrderItem['status'][] = ['preparing', 'dispatched', 'delivered'];
     let stepTimes = [4500, 9000, 14000];
     let stepProgress = [40, 75, 100];
@@ -501,7 +746,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           prevOrders.map(o => {
             if (o.id !== orderId) return o;
             
-            // Notification triggers
             if (step === 'preparing') showToast(`Cooking at ${o.restaurantName}...`, "info");
             if (step === 'dispatched') showToast("Driver picked up your meal!", "info");
             if (step === 'delivered') showToast("Meal delivered! Enjoy your fresh nutrition.", "info");
@@ -561,7 +805,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dietPreference: 'anything',
         allergies: [],
         mealSchedule: user.mealSchedule,
-        hasSubscription: true,
+        subscriptionTier: 'free' as const,
         onboarded: false
       },
       athlete_global: {
@@ -576,7 +820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dietPreference: 'anything',
         allergies: [],
         mealSchedule: user.mealSchedule,
-        hasSubscription: false,
+        subscriptionTier: 'premium' as const,
         onboarded: false
       }
     };
@@ -595,10 +839,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast("Profile set up! Personalized meal plan calculated.");
   };
 
-  // Run initial calculation review load
   useEffect(() => {
     recalculateMacrosAndPlans();
-  }, []);
+    clearChat();
+  }, [auth.isLoggedIn]);
 
   return (
     <AppContext.Provider value={{
@@ -613,6 +857,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       foodDatabase,
       restaurants,
       toasts,
+      
+      auth,
+      login,
+      signup,
+      logout,
+      
+      geminiApiKey,
+      saveGeminiApiKey,
+      chatMessages,
+      sendChatMessage,
+      clearChat,
+      isAiGenerating,
+
+      activities,
+      addStravaActivity,
+
+      changeSubscriptionTier,
+      
       updateUserProfile,
       logMealState,
       substituteMeal,

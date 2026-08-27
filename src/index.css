@@ -1553,3 +1553,17 @@ h1, h2, h3, h4, h5, h6 {
         display: flex;
     }
 }
+
+/* Responsive grid split helpers */
+.responsive-grid-split {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 2rem;
+}
+
+@media (max-width: 900px) {
+    .responsive-grid-split {
+        grid-template-columns: 1fr !important;
+        gap: 1.5rem;
+    }
+}

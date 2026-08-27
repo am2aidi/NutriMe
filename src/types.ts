@@ -11,6 +11,7 @@ export interface UserProfile {
   region: 'rwanda' | 'global';
   city: string;
   allergies: string[];
+  medicalConditions: string[]; // e.g. 'diabetes', 'hypertension', 'celiac', 'lactose'
   mealSchedule: {
     breakfast: string;
     lunch: string;
@@ -37,13 +38,30 @@ export interface ChatMessage {
 
 export interface StravaActivity {
   id: string;
-  type: 'run' | 'ride';
+  type: 'run' | 'ride'; // run (foot), ride (bicycle)
   name: string;
   distanceKm: number;
   durationMins: number;
   caloriesBurned: number;
   date: string;
   path: [number, number][]; // coordinates for Leaflet lines
+}
+
+export interface Medal {
+  id: string;
+  title: string;
+  description: string;
+  type: 'gold' | 'silver' | 'bronze';
+  unlocked: boolean;
+  category: 'run' | 'ride' | 'streak';
+  threshold: number; // km or days
+}
+
+export interface HealthStats {
+  steps: number;
+  sleepHours: number;
+  restingHeartRate: number;
+  lastSynced: string;
 }
 
 export interface DailyTargets {

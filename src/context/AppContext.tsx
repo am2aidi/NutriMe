@@ -10,7 +10,9 @@ import type {
   RecoveryState,
   AuthState,
   ChatMessage,
-  StravaActivity
+  StravaActivity,
+  Medal,
+  HealthStats
 } from '../types';
 
 // ==========================================
@@ -111,7 +113,7 @@ const INITIAL_ACTIVITIES: StravaActivity[] = [
   {
     id: 'act_2',
     type: 'run',
-    name: 'Kimihurura Valley Jog',
+    name: 'Kimihurura Valley Foot Jog',
     distanceKm: 5.2,
     durationMins: 28,
     caloriesBurned: 312,
@@ -124,6 +126,15 @@ const INITIAL_ACTIVITIES: StravaActivity[] = [
       [-1.9485, 30.0924]  // return
     ]
   }
+];
+
+const INITIAL_MEDALS: Medal[] = [
+  { id: 'm_run_3', title: 'Sprinting Start', description: 'Complete a foot run of 3km or more.', type: 'bronze', unlocked: true, category: 'run', threshold: 3 },
+  { id: 'm_run_10', title: '10K Warrior', description: 'Complete a foot run of 10km or more.', type: 'silver', unlocked: false, category: 'run', threshold: 10 },
+  { id: 'm_run_21', title: 'Half Marathoner', description: 'Complete a foot run of 21km or more.', type: 'gold', unlocked: false, category: 'run', threshold: 21 },
+  { id: 'm_ride_5', title: 'First Pedal', description: 'Log a cycling workout of 5km or more.', type: 'bronze', unlocked: true, category: 'ride', threshold: 5 },
+  { id: 'm_ride_20', title: 'Heights Climber', description: 'Log a cycling workout of 20km or more.', type: 'silver', unlocked: false, category: 'ride', threshold: 20 },
+  { id: 'm_ride_50', title: 'Kigali Centurion', description: 'Log a cycling workout of 50km or more.', type: 'gold', unlocked: false, category: 'ride', threshold: 50 }
 ];
 
 // ==========================================
@@ -162,9 +173,14 @@ interface AppContextType {
   clearChat: () => void;
   isAiGenerating: boolean;
 
-  // Strava activities
+  // Strava activities & medals
   activities: StravaActivity[];
+  medals: Medal[];
   addStravaActivity: (type: 'run' | 'ride', name: string, distanceKm: number, durationMins: number, path: [number, number][]) => void;
+
+  // Health app sync
+  healthStats: HealthStats;
+  syncHealthApp: () => void;
 
   // Subscriptions & scanner
   changeSubscriptionTier: (tier: 'free' | 'premium' | 'ultimate') => void;
@@ -186,7 +202,6 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Navigation & Toast alerts
   const [activeTab, setActiveTab] = useState<string>('setup');
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
 
@@ -197,7 +212,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     name: null
   });
 
-  // Gemini API Key (loaded from localStorage if exists)
+  // Gemini API Key
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
     return localStorage.getItem('nutrime_gemini_key') || '';
   });
@@ -206,9 +221,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
 
-  // Strava activity log state
+  // Strava activities & medals state
   const [activities, setActivities] = useState<StravaActivity[]>(INITIAL_ACTIVITIES);
-  const [burnedCalories, setBurnedCalories] = useState(746); // Init preloaded workouts calorie burn sum
+  const [medals, setMedals] = useState<Medal[]>(INITIAL_MEDALS);
+  const [burnedCalories, setBurnedCalories] = useState(746); 
+
+  // Health App Sync stats state
+  const [healthStats, setHealthStats] = useState<HealthStats>({
+    steps: 7240,
+    sleepHours: 6.8,
+    restingHeartRate: 66,
+    lastSynced: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  });
 
   // Databases
   const [foodDatabase, setFoodDatabase] = useState<FoodItem[]>(INITIAL_FOOD_DATABASE);
@@ -233,6 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     region: 'rwanda',
     city: 'Kigali',
     allergies: [],
+    medicalConditions: [], // diabetes, hypertension, celiac, lactose
     mealSchedule: {
       breakfast: '08:00',
       lunch: '13:00',
@@ -296,7 +321,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast("Gemini API key saved! Chatbot now running live AI.", "info");
   };
 
-  // Chatbot send action (live fetch to gemini API endpoint)
+  // Chatbot send action
   const sendChatMessage = async (text: string) => {
     if (!text.trim()) return;
 
@@ -312,16 +337,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const promptContext = `
       You are the NutriMe AI Personal Assistant. The user's goal is: ${user.goal === 'loss' ? 'weight loss' : user.goal === 'gain' ? 'muscle gain' : 'maintenance'}.
-      Their body metrics are: weight ${user.weight}kg, height ${user.height}cm, age ${user.age} years.
-      They live in region: ${user.region} (City: ${user.city}).
-      Their daily nutritional targets are: ${targets.calories} kcal, ${targets.protein}g protein, ${targets.carbs}g carbs, ${targets.fat}g fat.
-      Today they have consumed: ${intake.calories} kcal, and burned ${burnedCalories} kcal through active workouts.
-      Keep answers concise, direct, supportive, and focus on healthy local foods (e.g. Rwandan staples like Isombe, Matooke, Brochettes, Ugali if region is Rwanda, or global healthy foods otherwise). Avoid complex jargon.
+      Body metrics: weight ${user.weight}kg, height ${user.height}cm. Region: ${user.region} (${user.city}).
+      Medical conditions: ${user.medicalConditions.length > 0 ? user.medicalConditions.join(', ') : 'None'}.
+      Daily targets: ${targets.calories} kcal, ${targets.protein}g protein, ${targets.carbs}g carbs, ${targets.fat}g fat.
+      Today consumed: ${intake.calories} kcal, and active burn: ${burnedCalories} kcal.
+      IMPORTANT: If the user has 'diabetes', emphasize low-glycemic indexes (e.g. recommend sweet potato over white ugali or cassava, strictly restrict refined sugars). If 'hypertension', recommend low sodium.
+      Keep answers concise, direct, supportive, and focus on healthy local Rwandan foods if region is Rwanda.
     `;
 
     try {
       if (geminiApiKey) {
-        // Direct call to Gemini 1.5 Flash endpoint
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
           {
@@ -351,22 +376,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const aiMsg: ChatMessage = {
           id: 'chat_' + Date.now() + '_a',
           sender: 'ai',
-          text: rawReply.replace(/\*\*/g, '').trim(), // strip markdown bolding for clean look
+          text: rawReply.replace(/\*\*/g, '').trim(), 
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setChatMessages(prev => [...prev, aiMsg]);
       } else {
-        // Mock fallback simulation
         setTimeout(() => {
           let reply = "Hello! To enable real AI responses, please enter your Gemini API Key in the settings at the top of the chat panel. Let me know if you need help generating one.";
           
           const textLower = text.toLowerCase();
           if (textLower.includes('eat') || textLower.includes('food') || textLower.includes('snack')) {
-            reply = user.region === 'rwanda' 
-              ? "For a quick snack in Kigali, I recommend a half portion of local Avocado with salt (approx 160 kcal, rich in healthy fats) or Umusururu porridge if you want a warm breakfast option."
-              : "For a quick snack, I suggest 30g of raw Almonds (160 kcal) or a plain Greek yogurt cup (130 kcal, 15g protein) to help hit your target.";
+            if (user.medicalConditions.includes('diabetes')) {
+              reply = "Since you selected Diabetes in your health records, avoid white flour pastes like Ugali or sugary juices. Go for boiled Sweet Potatoes with Isombe, which are rich in slow-digesting fibers and have a lower glycemic index.";
+            } else {
+              reply = user.region === 'rwanda' 
+                ? "For a quick snack in Kigali, I recommend a half portion of local Avocado with salt (approx 160 kcal, rich in healthy fats) or Umusururu porridge if you want a warm breakfast option."
+                : "For a quick snack, I suggest 30g of raw Almonds (160 kcal) or a plain Greek yogurt cup (130 kcal, 15g protein) to help hit your target.";
+            }
           } else if (textLower.includes('calorie') || textLower.includes('macro')) {
-            reply = `Your calculated target calorie allowance for today is ${targets.calories} kcal (including ${burnedCalories} kcal extra burned from bike/runs). You have consumed ${intake.calories} kcal so far.`;
+            reply = `Your calculated target calorie allowance for today is ${targets.calories} kcal. You have consumed ${intake.calories} kcal so far.`;
           }
 
           const aiMsg: ChatMessage = {
@@ -383,7 +411,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const aiMsg: ChatMessage = {
         id: 'chat_' + Date.now() + '_err',
         sender: 'ai',
-        text: "Error connecting to Gemini API. Please check your network connection and ensure your API key is correct.",
+        text: "Error connecting to Gemini API. Please check your network connection and API key.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setChatMessages(prev => [...prev, aiMsg]);
@@ -397,13 +425,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       {
         id: 'chat_welcome',
         sender: 'ai',
-        text: `Hi ${auth.name || 'there'}! I am your NutriMe AI Assistant. Ask me anything about local foods, macro targets, or recipe advice!`,
+        text: `Hi ${auth.name || 'there'}! I am your NutriMe AI Assistant. Ask me anything about local foods, macro targets, or health advice!`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
   };
 
-  // Strava activities
+  // Sync health data from Apple Health / Google Fit
+  const syncHealthApp = () => {
+    setHealthStats({
+      steps: 10420,
+      sleepHours: 7.5,
+      restingHeartRate: 62,
+      lastSynced: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    showToast("Synced with Google Fit / Health App!", "info");
+  };
+
+  // Strava activities & Medals
   const addStravaActivity = (
     type: 'run' | 'ride', 
     name: string, 
@@ -411,7 +450,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     durationMins: number,
     path: [number, number][]
   ) => {
-    // Run: 60 kcal per km. Ride: 35 kcal per km.
     const burn = Math.round(distanceKm * (type === 'run' ? 60 : 35));
     const newAct: StravaActivity = {
       id: 'act_' + Date.now(),
@@ -427,7 +465,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivities(prev => [newAct, ...prev]);
     setBurnedCalories(prev => {
       const nextBurn = prev + burn;
-      // Adjust targets
       setTargets(t => ({
         ...t,
         calories: t.calories + burn,
@@ -435,6 +472,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
       return nextBurn;
     });
+
+    // Check achievement medals thresholds
+    setMedals(prevMedals => 
+      prevMedals.map(medal => {
+        if (!medal.unlocked && medal.category === type && distanceKm >= medal.threshold) {
+          showToast(`🏆 Medal Unlocked: ${medal.title}!`, 'success');
+          return { ...medal, unlocked: true };
+        }
+        return medal;
+      })
+    );
 
     showToast(`Strava synced: ${name} (+${burn} kcal burned)`, 'info');
   };
@@ -474,7 +522,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Math.round(bmr * (multipliers[activity] || 1.2));
   };
 
-  // Recalculates Target Macros & updates Meal Generation Planner
+  // Recalculates Target Macros
   const recalculateMacrosAndPlans = (customUser = user, currentFoods = foodDatabase, activeBurned = burnedCalories) => {
     const bmr = calculateBMR(customUser.weight, customUser.height, customUser.age, customUser.gender);
     const tdee = calculateTDEE(bmr, customUser.activity);
@@ -487,11 +535,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     kcal = Math.round(kcal);
 
-    // Apply active calorie adjustment from workouts
     const totalKcal = kcal + activeBurned;
 
+    // Adjust macro ratios if diabetes is active (low carb, higher protein/fat)
     let pRatio = 0.20, cRatio = 0.50, fRatio = 0.30;
-    if (customUser.goal === 'loss') {
+    if (customUser.medicalConditions.includes('diabetes')) {
+      // Low Glycemic, diabetic protocol
+      pRatio = 0.35; fRatio = 0.35; cRatio = 0.30;
+    } else if (customUser.goal === 'loss') {
       pRatio = 0.30; fRatio = 0.25; cRatio = 0.45;
     } else if (customUser.goal === 'gain') {
       pRatio = 0.25; fRatio = 0.25; cRatio = 0.50;
@@ -520,9 +571,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const ratio = ratios[m.id] || 0;
         const slotCal = Math.round(totalKcal * ratio);
         
-        const candidates = currentFoods.filter(food => 
+        // Exclude sweet/sugary foods or high glycemic meals if Diabetic
+        let candidates = currentFoods.filter(food => 
           food.category === m.type && food.region === customUser.region
         );
+        
+        if (customUser.medicalConditions.includes('diabetes')) {
+          candidates = candidates.filter(f => f.carbs < 40); // safety restriction
+        }
         
         if (candidates.length > 0) {
           let bestFood = candidates[0];
@@ -804,6 +860,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         city: 'Kigali',
         dietPreference: 'anything',
         allergies: [],
+        medicalConditions: ['diabetes'], // diabetic preset!
         mealSchedule: user.mealSchedule,
         subscriptionTier: 'free' as const,
         onboarded: false
@@ -819,6 +876,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         city: 'London',
         dietPreference: 'anything',
         allergies: [],
+        medicalConditions: [],
         mealSchedule: user.mealSchedule,
         subscriptionTier: 'premium' as const,
         onboarded: false
@@ -871,7 +929,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isAiGenerating,
 
       activities,
+      medals,
       addStravaActivity,
+
+      healthStats,
+      syncHealthApp,
 
       changeSubscriptionTier,
       

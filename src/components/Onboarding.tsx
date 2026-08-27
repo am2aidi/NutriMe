@@ -235,6 +235,47 @@ export const Onboarding: React.FC = () => {
                 onChange={(e) => updateUserProfile({ city: e.target.value })} 
               />
             </div>
+
+            <div className="form-group" style={{ marginTop: '1.5rem' }}>
+              <label className="form-label">Medical Records & Conditions</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                {[
+                  { id: 'diabetes', label: 'Diabetes (Type 1 or 2)' },
+                  { id: 'hypertension', label: 'Hypertension (High BP)' },
+                  { id: 'celiac', label: 'Celiac Disease (Gluten-Free)' },
+                  { id: 'lactose', label: 'Lactose Intolerance' }
+                ].map(cond => {
+                  const hasCond = user.medicalConditions.includes(cond.id);
+                  return (
+                    <label key={cond.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: hasCond ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${hasCond ? 'var(--color-primary)' : 'var(--surface-border)'}`,
+                      padding: '0.75rem',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      color: hasCond ? 'white' : 'var(--text-muted)'
+                    }}>
+                      <input 
+                        type="checkbox"
+                        checked={hasCond}
+                        onChange={() => {
+                          const nextCond = hasCond 
+                            ? user.medicalConditions.filter(c => c !== cond.id)
+                            : [...user.medicalConditions, cond.id];
+                          updateUserProfile({ medicalConditions: nextCond });
+                        }}
+                        style={{ accentColor: 'var(--color-primary)' }}
+                      />
+                      {cond.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
             
             <div className="setup-navigation-btns">
               <button className="btn btn-secondary" onClick={prevStep}><i className="fas fa-arrow-left"></i> Back</button>

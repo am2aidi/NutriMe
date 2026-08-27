@@ -347,6 +347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       if (geminiApiKey) {
+        // Direct browser client-side request if they entered a local custom key
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
           {
@@ -381,8 +382,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         setChatMessages(prev => [...prev, aiMsg]);
       } else {
-        setTimeout(() => {
-          let reply = "Hello! To enable real AI responses, please enter your Gemini API Key in the settings at the top of the chat panel. Let me know if you need help generating one.";
+        // Fallback: Query Vercel serverless function to utilize the repository environment variables
+        try {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: text,
+              promptContext
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('Vercel proxy failed');
+          }
+
+          const data = await response.json();
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          const aiMsg: ChatMessage = {
+            id: 'chat_' + Date.now() + '_a',
+            sender: 'ai',
+            text: data.reply.replace(/\*\*/g, '').trim(),
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          setChatMessages(prev => [...prev, aiMsg]);
+        } catch (proxyError) {
+          // If serverless proxy fails (e.g. running local npm run dev with no env variable), use mock responses
+          console.warn("Vercel proxy error, falling back to simulated logic:", proxyError);
+          let reply = "Hello! To enable real AI responses, please enter your Gemini API Key in the settings at the top of the chat panel, or configure GEMINI_API_KEY in your Vercel Dashboard.";
           
           const textLower = text.toLowerCase();
           if (textLower.includes('eat') || textLower.includes('food') || textLower.includes('snack')) {
@@ -404,18 +436,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           };
           setChatMessages(prev => [...prev, aiMsg]);
-        }, 1500);
+        }
       }
     } catch (err) {
       console.error(err);
       const aiMsg: ChatMessage = {
         id: 'chat_' + Date.now() + '_err',
         sender: 'ai',
-        text: "Error connecting to Gemini API. Please check your network connection and API key.",
+        text: "Error connecting to AI service. Please verify your internet connection or configure an API key.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setChatMessages(prev => [...prev, aiMsg]);
-    } finally {
+    }
+ finally {
       setIsAiGenerating(false);
     }
   };
